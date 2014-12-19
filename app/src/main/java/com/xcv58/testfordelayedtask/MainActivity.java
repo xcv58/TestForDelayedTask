@@ -23,6 +23,8 @@ public class MainActivity extends Activity {
 
     private DelayedTaskService mService;
     private boolean mBound;
+    private int requestCode;
+
 
     private ServiceConnection mConnection = new ServiceConnection() {
         @Override
@@ -48,6 +50,7 @@ public class MainActivity extends Activity {
         Intent intent = new Intent(this, DelayedTaskService.class);
         bindService(intent, mConnection, Context.BIND_AUTO_CREATE);
         setContentView(R.layout.activity_main);
+        requestCode = 1;
     }
 
 
@@ -92,9 +95,9 @@ public class MainActivity extends Activity {
 
         if (mBound) {
             Intent intent = new Intent(this, DisplayMessageActivity.class);
-            intent.putExtra(EXTRA_MESSAGE, message);
+            intent.putExtra(EXTRA_MESSAGE, message + " " + System.currentTimeMillis());
 
-            PendingIntent pintent = PendingIntent.getActivity(getBaseContext(), 1,intent, PendingIntent.FLAG_UPDATE_CURRENT);
+            PendingIntent pintent = PendingIntent.getActivity(getBaseContext(), requestCode++, intent, PendingIntent.FLAG_UPDATE_CURRENT);
             mService.setDelayedTask(pintent, delay);
         }
 
