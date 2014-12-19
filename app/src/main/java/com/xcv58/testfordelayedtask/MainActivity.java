@@ -1,16 +1,52 @@
 package com.xcv58.testfordelayedtask;
 
 import android.app.Activity;
+import android.app.PendingIntent;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.content.ServiceConnection;
 import android.os.Bundle;
+import android.os.IBinder;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
+import android.widget.EditText;
+import android.widget.TextView;
+
+import java.util.Collections;
 
 
 public class MainActivity extends Activity {
+    public final static String EXTRA_MESSAGE = "com.xcv58.testfordelayedtask.MESSAGE";
+    public final static String TAG = "TestForDelayedTask";
+
+    private DelayedTaskService mService;
+    private boolean mBound;
+
+    private ServiceConnection mConnection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName className,
+                                       IBinder service) {
+            // We've bound to LocalService, cast the IBinder and get LocalService instance
+//            Log.d(TAG, "ServiceConnection");
+            DelayedTaskService.LocalBinder binder = (DelayedTaskService.LocalBinder) service;
+            mService = binder.getService();
+            mBound = true;
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName arg0) {
+            mBound = false;
+        }
+    };
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Intent intent = new Intent(this, DelayedTaskService.class);
+        bindService(intent, mConnection, Context.BIND_AUTO_CREATE);
         setContentView(R.layout.activity_main);
     }
 
@@ -36,4 +72,41 @@ public class MainActivity extends Activity {
 
         return super.onOptionsItemSelected(item);
     }
+
+    /** Called when the user clicks the Send button */
+    public void sendMessage(View view) {
+        TextView textView = (TextView) findViewById(R.id.text_view);
+        EditText editText = (EditText) findViewById(R.id.edit_message);
+        EditText timeText = (EditText) findViewById(R.id.delayed_time);
+
+        String timeString = timeText.getText().toString();
+
+        int delay = timeString.length() > 0 ? Integer.parseInt(timeString) : 0;
+
+        String origin = textView.getText().toString();
+        String message = editText.getText().toString();
+        textView.setText(origin + "\n" + message + "\t" + delay);
+
+        editText.setText("");
+        timeText.setText("");
+
+        if (mBound) {
+            Intent intent = new Intent(this, DisplayMessageActivity.class);
+            intent.putExtra(EXTRA_MESSAGE, message);
+
+            PendingIntent pintent = PendingIntent.getActivity(getBaseContext(), 1,intent, PendingIntent.FLAG_UPDATE_CURRENT);
+            mService.setDelayedTask(pintent, delay);
+        }
+
+//        textView.setText(editText.getText().toString());
+
+//        Intent intent = new Intent(this, DisplayMessageActivity.class);
+//        String message = editText.getText().toString();
+//        intent.putExtra(EXTRA_MESSAGE, message);
+
+//        Log.d("TEST", " " + delay);
+//        PendingIntent pintent = PendingIntent.getActivity(getBaseContext(), 1,intent, PendingIntent.FLAG_UPDATE_CURRENT);
+//        joulerPolicy.setDelayedTask(pintent, delay);
+    }
+
 }
