@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.TextView;
 
 /**
@@ -21,6 +22,7 @@ public class DisplayMessageActivity extends Activity {
         }
         Intent intent = getIntent();
         String message = intent.getStringExtra(MainActivity.EXTRA_MESSAGE);
+        Log.d(DelayedTaskService.TAG, message);
 
         // Create the text view
         TextView textView = new TextView(this);
