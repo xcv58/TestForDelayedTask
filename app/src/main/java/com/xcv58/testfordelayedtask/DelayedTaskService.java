@@ -2,6 +2,7 @@ package com.xcv58.testfordelayedtask;
 
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
 import android.os.Binder;
 import android.os.Handler;
@@ -25,6 +26,28 @@ public class DelayedTaskService extends Service {
         private Handler handler;
         private ReentrantLock lock;
         private boolean existBunchTask;
+        private int delayedTime;
+
+        private final Runnable runnable = new Runnable() {
+            public void run() {
+                Log.d(TAG, "Acquire lock from runnable");
+                lock.lock();
+                List<PendingIntent> tmpList = pendingIntentList;
+                pendingIntentList = new ArrayList<PendingIntent>();
+                existBunchTask = false;
+                Log.d(TAG, "Release lock from runnable");
+                lock.unlock();
+                try {
+                    Log.d(TAG, "" + tmpList.size());
+                    for (PendingIntent pendingIntent : tmpList) {
+//                                Log.d(TAG, pendingIntent)
+                        pendingIntent.send();
+                    }
+                } catch (PendingIntent.CanceledException e) {
+                    e.printStackTrace();
+                }
+            }
+        };
 
         public PendingIntentPool() {
             pendingIntentList = new ArrayList<PendingIntent>();
@@ -33,44 +56,37 @@ public class DelayedTaskService extends Service {
             handler = new Handler();
         }
 
+        public void release() {
+            Log.d(TAG, "Acquire lock from release");
+            lock.lock();
+            if (existBunchTask) {
+                handler.removeCallbacks(runnable);
+                handler.postDelayed(runnable, 0);
+            }
+            Log.d(TAG, "Release lock from release");
+            lock.unlock();}
+
         public void add(final PendingIntent pendingIntent, int delay) {
             Log.d(TAG, "Acquire lock from add");
             lock.lock();
-            if (existBunchTask) {
-                Log.d(TAG, "Exist timer, just add it.");
-                pendingIntentList.add(pendingIntent);
-            } else {
-                pendingIntentList.add(pendingIntent);
+            pendingIntentList.add(pendingIntent);
+            if (!existBunchTask) {
                 Log.d(TAG, "No timer, set a timer for " + delay + " seconds.");
                 // set a timer for bunch tasks
-                final Runnable r = new Runnable() {
-                    public void run() {
-                        Log.d(TAG, "Acquire lock from runnable");
-                        lock.lock();
-                        List<PendingIntent> tmpList = pendingIntentList;
-                        pendingIntentList = new ArrayList<PendingIntent>();
-                        existBunchTask = false;
-                        Log.d(TAG, "Release lock from runnable");
-                        lock.unlock();
-                        try {
-                            Log.d(TAG, "" + tmpList.size());
-                            for (PendingIntent pendingIntent : tmpList) {
-//                                Log.d(TAG, pendingIntent)
-                                pendingIntent.send();
-                                Thread.sleep(1000);
-                            }
-                        } catch (PendingIntent.CanceledException e) {
-                            e.printStackTrace();
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                };
-                handler.postDelayed(r, delay * 1000);
+                handler.postDelayed(runnable, delay);
                 existBunchTask = true;
             }
             Log.d(TAG, "Release lock from add");
             lock.unlock();
+        }
+
+        public void add(final PendingIntent pendingIntent) {
+            this.add(pendingIntent, delayedTime);
+        }
+
+        public boolean setDelayedTime(int delay) {
+            this.delayedTime = delay;
+            return true;
         }
     }
 
@@ -129,11 +145,30 @@ public class DelayedTaskService extends Service {
         Toast.makeText(getBaseContext(), packageName + "\t" + uid, Toast.LENGTH_SHORT).show();
         PendingIntentPool pool = getPendingIntentPool(packageName);
         pool.add(pendingIntent, delay);
-//        try {
-//            pendingIntent.send();
-//        } catch (PendingIntent.CanceledException e) {
-//            e.printStackTrace();
-//        }
+    }
+
+    public void addDelayedTask(PendingIntent pendingIntent) {
+        String packageName = pendingIntent.getCreatorPackage();
+        int uid = pendingIntent.getCreatorUid();
+        Toast.makeText(getBaseContext(), packageName + "\t" + uid, Toast.LENGTH_SHORT).show();
+        PendingIntentPool pool = getPendingIntentPool(packageName);
+        pool.add(pendingIntent);
+    }
+
+
+    public boolean setMaximumDelayTime(Context context, int delay) {
+        String packageName = context.getPackageName();
+        PendingIntentPool pool = getPendingIntentPool(packageName);
+        pool.setDelayedTime(delay);
+        return true;
+    }
+
+    public void releaseAll() {
+        for (String packageName : poolMap.keySet()) {
+            PendingIntentPool pool = poolMap.get(packageName);
+            Log.d(TAG, "Release " + packageName);
+            pool.release();
+        }
     }
 
     public PendingIntentPool getPendingIntentPool(String packageName) {

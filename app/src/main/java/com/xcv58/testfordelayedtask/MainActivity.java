@@ -8,6 +8,7 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -24,6 +25,8 @@ public class MainActivity extends Activity {
     private DelayedTaskService mService;
     private boolean mBound;
     private int requestCode;
+    private final static int DELAYED_TIME = 5000;
+    private static boolean delayedTimeSet;
 
 
     private ServiceConnection mConnection = new ServiceConnection() {
@@ -48,11 +51,11 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Intent intent = new Intent(this, DelayedTaskService.class);
+        startService(intent);
         bindService(intent, mConnection, Context.BIND_AUTO_CREATE);
         setContentView(R.layout.activity_main);
         requestCode = 1;
     }
-
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -74,6 +77,14 @@ public class MainActivity extends Activity {
         }
 
         return super.onOptionsItemSelected(item);
+    }
+
+    public void release(View view) {
+        Log.d(TAG, "Release button pressed.");
+        if (mBound) {
+            Log.d(TAG, "Release button pressed. Service bounded");
+            mService.releaseAll();
+        }
     }
 
     /** Called when the user clicks the Send button */
@@ -98,7 +109,9 @@ public class MainActivity extends Activity {
             intent.putExtra(EXTRA_MESSAGE, message + " " + System.currentTimeMillis());
 
             PendingIntent pintent = PendingIntent.getActivity(getBaseContext(), requestCode++, intent, PendingIntent.FLAG_UPDATE_CURRENT);
-            mService.setDelayedTask(pintent, delay);
+            this.initDelay(delay * 1000);
+            mService.addDelayedTask(pintent);
+//            mService.setDelayedTask(pintent, delay);
         }
 
 //        textView.setText(editText.getText().toString());
@@ -110,6 +123,22 @@ public class MainActivity extends Activity {
 //        Log.d("TEST", " " + delay);
 //        PendingIntent pintent = PendingIntent.getActivity(getBaseContext(), 1,intent, PendingIntent.FLAG_UPDATE_CURRENT);
 //        joulerPolicy.setDelayedTask(pintent, delay);
+    }
+
+    private boolean initDelay(int delay) {
+        if (delayedTimeSet) {
+            return false;
+        }
+        if (delay < 0 ) {
+            Log.e(TAG, "Wrong delay time.");
+            return false;
+        }
+        delayedTimeSet = true;
+        return mService.setMaximumDelayTime(getApplicationContext(), delay);
+    }
+
+    private boolean initDelay() {
+        return this.initDelay(DELAYED_TIME);
     }
 
 }
